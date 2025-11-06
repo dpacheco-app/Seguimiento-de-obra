@@ -1,0 +1,5 @@
+{
+  "name": "Seguimiento de Avance de Obra",
+  "description": "Una aplicación web para el seguimiento del progreso de la construcción por torre, piso y actividad, utilizando Google Sheets como base de datos.",
+  "requestFramePermissions": []
+}
