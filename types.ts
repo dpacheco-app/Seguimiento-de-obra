@@ -8,6 +8,7 @@ export interface ProjectConfig {
   Torres: string[];
   PisosPorTorre: PisosPorTorre;
   Actividades: string[];
+  ScheduledProgress: { [activity: string]: number };
 }
 
 export interface ProgressRecord {

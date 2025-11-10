@@ -32,7 +32,6 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
   const progressMap = useMemo(() => {
     const map = new Map<string, ProgressRecord>();
     if (progress) {
-      // Ordena el progreso por timestamp para asegurar que el último registro sea el que prevalezca.
       const sortedProgress = [...progress].sort((a, b) => new Date(a.Timestamp).getTime() - new Date(b.Timestamp).getTime());
       sortedProgress.forEach(p => {
         const key = `${p.Torre}-${p.Piso}-${p.Actividad}`;
@@ -46,8 +45,30 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
     return progressMap.get(`${tower}-${piso}-${actividad}`);
   };
 
+  const pisosParaTorre = config?.PisosPorTorre?.[selectedTower] || 1;
+
+  const activityTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    if (!selectedTower || !pisosParaTorre) return totals;
+
+    selectedActivities.forEach(activity => {
+        let totalProgress = 0;
+        for (let piso = 1; piso <= pisosParaTorre; piso++) {
+            const record = progressMap.get(`${selectedTower}-${piso}-${activity}`);
+            if (record) {
+                totalProgress += record.Avance;
+            }
+        }
+        const average = pisosParaTorre > 0 ? totalProgress / pisosParaTorre : 0;
+        totals.set(activity, Math.round(average));
+    });
+
+    return totals;
+  }, [selectedTower, selectedActivities, pisosParaTorre, progressMap]);
+
+
   const colorFor = (value: number | undefined): string => {
-    if (value === undefined) return "bg-gray-200"; // Sin datos
+    if (value === undefined || value === null) return "bg-gray-200";
     if (value === 0) return "bg-red-500 text-white";
     if (value >= 1 && value <= 49) return "bg-orange-400 text-white";
     if (value === 50) return "bg-yellow-400 text-gray-800";
@@ -60,11 +81,22 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
     if (record) {
       const formattedDate = new Date(record.Fecha).toLocaleDateString('es-ES');
       setTooltip({
-        content: `<strong>Torre:</strong> ${record.Torre}<br/><strong>Piso:</strong> ${piso}<br/><strong>Actividad:</strong> ${actividad}<br/><strong>Avance:</strong> ${record.Avance}%<br/><strong>Fecha:</strong> ${formattedDate}<br/><strong>Usuario:</strong> ${record.Usuario}`,
+        content: `<strong>Torre:</strong> ${record.Torre}<br/><strong>Piso:</strong> ${piso}<br/><strong>Actividad:</strong> ${actividad}<br/><strong>Avance Real:</strong> ${record.Avance}%<br/><strong>Fecha:</strong> ${formattedDate}<br/><strong>Usuario:</strong> ${record.Usuario}`,
         x: e.pageX,
         y: e.pageY,
       });
     }
+  };
+
+ const handleTotalMouseEnter = (e: React.MouseEvent, value: number | undefined, actividad: string, isScheduled: boolean = false) => {
+    if (value === undefined) return;
+    const title = isScheduled ? 'Avance Programado' : 'Avance Promedio Real';
+    const note = isScheduled ? "<i class='text-gray-300'>Promedio en toda la torre</i>" : "<i class='text-gray-300'>Promedio en toda la torre</i>";
+    setTooltip({
+      content: `<strong>Actividad:</strong> ${actividad}<br/><strong>${title}:</strong> ${value}%<br/>${note}`,
+      x: e.pageX,
+      y: e.pageY,
+    });
   };
 
   const handleMouseLeave = () => {
@@ -89,13 +121,12 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
         const imgData = canvas.toDataURL('image/png');
         
         const margin = 15;
-        const pdf = new jsPDF('p', 'mm', 'letter');
+        const pdf = new jsPDF('l', 'mm', 'letter'); // 'l' for landscape
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
         
         let currentY = margin;
 
-        // --- Encabezado del PDF ---
         pdf.setFontSize(22);
         pdf.setFont('helvetica', 'bold');
         pdf.text('Informe de Avance de Obra', pdfWidth / 2, currentY, { align: 'center' });
@@ -104,18 +135,16 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
         pdf.line(margin, currentY, pdfWidth - margin, currentY);
         currentY += 10;
 
-        // --- Detalles del Proyecto ---
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'bold');
         pdf.text('Proyecto:', margin, currentY);
         pdf.setFont('helvetica', 'normal');
         pdf.text(config.Proyecto, margin + 40, currentY);
-        currentY += 8;
         
         pdf.setFont('helvetica', 'bold');
-        pdf.text('Torre Seleccionada:', margin, currentY);
+        pdf.text('Torre Seleccionada:', margin + 100, currentY);
         pdf.setFont('helvetica', 'normal');
-        pdf.text(selectedTower, margin + 40, currentY);
+        pdf.text(selectedTower, margin + 140, currentY);
         currentY += 8;
         
         const reportDate = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -125,7 +154,6 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
         pdf.text(reportDate, margin + 40, currentY);
         currentY += 15;
 
-        // --- Imagen de la Tabla (con cálculo de aspecto corregido) ---
         const availableWidth = pdfWidth - margin * 2;
         const availableHeight = pdfHeight - currentY - margin;
         
@@ -135,22 +163,16 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
         let finalWidth, finalHeight;
 
         if (availableWidth / availableHeight > canvasAspectRatio) {
-            // El espacio disponible es más ancho que la imagen, la altura es el límite
             finalHeight = availableHeight;
             finalWidth = finalHeight * canvasAspectRatio;
         } else {
-            // El espacio disponible es más alto que la imagen, el ancho es el límite
             finalWidth = availableWidth;
             finalHeight = finalWidth / canvasAspectRatio;
         }
-
-        // Centrar la imagen horizontalmente
-        const xOffset = margin + (availableWidth - finalWidth) / 2;
         
+        const xOffset = margin + (availableWidth - finalWidth) / 2;
         pdf.addImage(imgData, 'PNG', xOffset, currentY, finalWidth, finalHeight);
-        currentY += finalHeight + 10;
-
-        // --- Pie de Página ---
+        
         pdf.setFontSize(8);
         pdf.setTextColor(150);
         pdf.text(`Informe generado para el proyecto "${config.Proyecto}".`, margin, pdfHeight - 10);
@@ -167,12 +189,10 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
     }
   };
 
-
   if (loading) return <LoadingSpinner />;
   if (error) return <div className="p-4 text-red-600">Error cargando el progreso: {error.message}</div>;
 
-  const pisosParaTorre = config?.PisosPorTorre?.[selectedTower] || 1;
-  const pisosArray = Array.from({ length: pisosParaTorre }, (_, i) => pisosParaTorre - i); // Descendente para visualización
+  const pisosArray = Array.from({ length: pisosParaTorre }, (_, i) => pisosParaTorre - i);
 
   return (
     <div className="p-4 sm:p-6 bg-white rounded-lg shadow-md">
@@ -203,36 +223,98 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
 
       <div className="overflow-x-auto mt-6">
         <div ref={gridRef} className="p-4 bg-orange-50 inline-block min-w-full">
-            <div style={{ display: 'grid', gridTemplateColumns: `auto repeat(${selectedActivities.length}, minmax(140px, 1fr))`, gap: '4px' }}>
-                {/* Cabecera vacía para la columna de pisos */}
-                <div className="font-bold text-sm text-center sticky top-0 bg-orange-200 p-2 rounded-tl-md">Piso</div>
-                {/* Cabeceras de Actividades */}
+            <div style={{ display: 'grid', gridTemplateColumns: `auto repeat(${selectedActivities.length * 2}, minmax(70px, 1fr))`, gap: '4px' }}>
+                
+                <div className="font-bold text-sm text-center sticky top-0 z-20 bg-orange-200 p-2 rounded-tl-md row-span-2 flex items-center justify-center">Piso</div>
+                
                 {selectedActivities.map(a => (
-                    <div key={a} className="font-bold text-sm text-center sticky top-0 bg-orange-200 p-2 truncate" title={a}>{a}</div>
+                    <div key={a} className="font-bold text-sm text-center sticky top-0 z-20 bg-orange-200 p-2 truncate col-span-2" title={a}>{a}</div>
                 ))}
                 
-                {/* Filas de Pisos */}
+                {selectedActivities.map(a => (
+                    <React.Fragment key={`${a}-sub`}>
+                        <div className="font-semibold text-xs text-center sticky top-10 z-20 bg-orange-100 p-1 rounded-sm">Real</div>
+                        <div className="font-semibold text-xs text-center sticky top-10 z-20 bg-orange-100 p-1 rounded-sm">Prog.</div>
+                    </React.Fragment>
+                ))}
+                
                 {pisosArray.map(piso => (
                     <React.Fragment key={piso}>
-                        <div className="font-bold text-sm text-center bg-orange-200 p-2 flex items-center justify-center">
+                        <div className="font-bold text-sm text-center bg-orange-200 p-2 flex items-center justify-center sticky left-0 z-10">
                             {piso}
                         </div>
                         {selectedActivities.map(actividad => {
                             const record = getCellRecord(selectedTower, piso, actividad);
-                            const colorClass = colorFor(record?.Avance);
+                            const avanceReal = record?.Avance;
+                            const colorClassReal = colorFor(avanceReal);
+                            
+                            // *** CAMBIO CLAVE: Buscar el avance programado por actividad Y por piso ***
+                            const avanceProgramado = config.ScheduledProgress?.[actividad]?.[piso];
+                            const colorClassProgramado = colorFor(avanceProgramado);
+
                             return (
-                                <div
-                                    key={`${piso}-${actividad}`}
-                                    className={`h-12 rounded flex items-center justify-center text-sm font-medium transition-colors ${colorClass}`}
-                                    onMouseEnter={(e) => handleMouseEnter(e, record, piso, actividad)}
-                                    onMouseLeave={handleMouseLeave}
-                                >
-                                    {record !== undefined ? `${record.Avance}%` : "-"}
-                                </div>
+                                <React.Fragment key={`${piso}-${actividad}`}>
+                                    <div
+                                        className={`h-12 rounded flex items-center justify-center text-sm font-medium transition-colors ${colorClassReal}`}
+// FIX: Changed 'ividad' to 'actividad' to fix variable not found error.
+                                        onMouseEnter={(e) => handleMouseEnter(e, record, piso, actividad)}
+                                        onMouseLeave={handleMouseLeave}
+                                    >
+                                        {avanceReal !== undefined ? `${avanceReal}%` : "-"}
+                                    </div>
+                                    <div
+                                        className={`h-12 rounded flex items-center justify-center text-sm font-medium transition-colors ${colorClassProgramado}`}
+// FIX: Changed 'ividad' to 'actividad' to fix variable not found error.
+                                        onMouseEnter={(e) => handleTotalMouseEnter(e, avanceProgramado, actividad, true)}
+                                        onMouseLeave={handleMouseLeave}
+                                    >
+                                        {avanceProgramado !== undefined ? `${avanceProgramado}%` : "-"}
+                                    </div>
+                                </React.Fragment>
                             );
                         })}
                     </React.Fragment>
                 ))}
+
+                <div className="font-bold text-sm text-center bg-orange-200 p-2 flex items-center justify-center rounded-bl-md sticky left-0 z-10">
+                    Total Avance
+                </div>
+                {selectedActivities.map(actividad => {
+                    const averageReal = activityTotals.get(actividad);
+                    const colorClassReal = colorFor(averageReal);
+
+                    // *** CAMBIO CLAVE: Calcular el promedio del avance programado para la torre ***
+                    let totalProgrammed = 0;
+                    for (let p = 1; p <= pisosParaTorre; p++) {
+                        const prog = config.ScheduledProgress?.[actividad]?.[p];
+                        if (prog !== undefined) {
+                            totalProgrammed += prog;
+                        }
+                    }
+                    const averageProgrammed = pisosParaTorre > 0 ? Math.round(totalProgrammed / pisosParaTorre) : 0;
+                    const colorClassProgramado = colorFor(averageProgrammed);
+
+                    return (
+                        <React.Fragment key={`total-${actividad}`}>
+                            <div
+                                className={`h-12 rounded flex items-center justify-center text-sm font-medium transition-colors ${colorClassReal}`}
+// FIX: Changed 'ividad' to 'actividad' to fix variable not found error.
+                                onMouseEnter={(e) => handleTotalMouseEnter(e, averageReal, actividad, false)}
+                                onMouseLeave={handleMouseLeave}
+                            >
+                                {averageReal !== undefined ? `${averageReal}%` : "-"}
+                            </div>
+                             <div
+                                className={`h-12 rounded flex items-center justify-center text-sm font-medium transition-colors ${colorClassProgramado}`}
+// FIX: Changed 'ividad' to 'actividad' to fix variable not found error.
+                                onMouseEnter={(e) => handleTotalMouseEnter(e, averageProgrammed, actividad, true)}
+                                onMouseLeave={handleMouseLeave}
+                            >
+                                {averageProgrammed !== undefined ? `${averageProgrammed}%` : "-"}
+                            </div>
+                        </React.Fragment>
+                    );
+                })}
             </div>
         </div>
       </div>

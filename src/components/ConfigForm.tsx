@@ -1,4 +1,4 @@
-
+// src/components/ConfigForm.tsx
 import React, { useState } from "react";
 import { saveConfigToSheets } from "../services/googleSheetsService";
 import { ProjectConfig, PisosPorTorre } from "../types";
@@ -21,11 +21,13 @@ export default function ConfigForm({ initialConfig, onSaved, onCancel }: ConfigF
     const [towers, setTowers] = useState<string[]>(initialConfig?.Torres || []);
     const [currentTower, setCurrentTower] = useState("");
     const [pisos, setPisos] = useState<PisosPorTorre>(initialConfig?.PisosPorTorre || {});
-    const [activities, setActivities] = useState<string[]>(initialConfig?.Actividades || []);
-    const [currentActivity, setCurrentActivity] = useState("");
     
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Estado para manejar la edición de una torre
+    const [editingTower, setEditingTower] = useState<string | null>(null);
+    const [newTowerName, setNewTowerName] = useState("");
 
     const addTower = () => {
         const newTower = currentTower.trim();
@@ -46,35 +48,63 @@ export default function ConfigForm({ initialConfig, onSaved, onCancel }: ConfigF
         setPisos(newPisos);
     };
 
-    const addActivity = () => {
-        const newActivity = currentActivity.trim();
-        if (!newActivity || activities.includes(newActivity)) {
-             setError(activities.includes(newActivity) ? "Esa actividad ya existe." : "El nombre de la actividad no puede estar vacío.");
-            return;
-        }
-        setActivities([...activities, newActivity]);
-        setCurrentActivity("");
+    const handleEditClick = (towerName: string) => {
+        setEditingTower(towerName);
+        setNewTowerName(towerName);
         setError(null);
     };
 
-    const removeActivity = (activityToRemove: string) => {
-        setActivities(activities.filter(a => a !== activityToRemove));
+    const handleCancelEdit = () => {
+        setEditingTower(null);
+        setNewTowerName("");
+        setError(null);
+    };
+
+    const handleUpdateTowerName = () => {
+        const originalName = editingTower;
+        const updatedName = newTowerName.trim();
+
+        if (!originalName) return;
+
+        if (!updatedName) {
+            setError("El nuevo nombre de la torre no puede estar vacío.");
+            return;
+        }
+
+        if (towers.includes(updatedName) && updatedName !== originalName) {
+            setError("Ya existe una torre con ese nombre.");
+            return;
+        }
+
+        setTowers(towers.map(t => (t === originalName ? updatedName : t)));
+
+        const newPisos = { ...pisos };
+        const floorCount = newPisos[originalName];
+        delete newPisos[originalName];
+        newPisos[updatedName] = floorCount;
+        setPisos(newPisos);
+
+        setEditingTower(null);
+        setNewTowerName("");
+        setError(null);
     };
 
     const handleSave = async () => {
         setError(null);
-        if (!projectName.trim() || towers.length === 0 || activities.length === 0) {
-            setError("Debe ingresar un nombre de proyecto, y al menos una torre y una actividad.");
+        if (!projectName.trim() || towers.length === 0) {
+            setError("Debe ingresar un nombre de proyecto y al menos una torre.");
+            return;
+        }
+        if (editingTower) {
+            setError("Por favor, termine de editar la torre actual antes de guardar.");
             return;
         }
         setSaving(true);
         try {
-            // BUG FIX: Construir el objeto ProjectConfig con la estructura correcta que espera el servicio.
-            const configToSave: ProjectConfig = {
-                Proyecto: projectName.trim(),
-                Torres: towers,
-                PisosPorTorre: pisos, // El estado 'pisos' ya tiene el formato correcto { torre: num_pisos }
-                Actividades: activities,
+            const configToSave = {
+                proyecto: projectName.trim(),
+                torres: towers.join(','),
+                pisosPorTorre: towers.map(t => pisos[t] || 1).join(','),
             };
             
             await saveConfigToSheets(configToSave);
@@ -101,45 +131,55 @@ export default function ConfigForm({ initialConfig, onSaved, onCancel }: ConfigF
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Torres</label>
                     <div className="flex gap-2">
-                        <input value={currentTower} onChange={e => setCurrentTower(e.target.value)} className="flex-grow p-2 border border-gray-300 rounded-md" placeholder="Nombre de la nueva torre"/>
-                        <button onClick={addTower} className="px-4 py-2 bg-orange-200 text-orange-800 rounded-md hover:bg-orange-300 font-semibold">Agregar</button>
+                        <input value={currentTower} onChange={e => setCurrentTower(e.target.value)} className="flex-grow p-2 border border-gray-300 rounded-md" placeholder="Nombre de la nueva torre" disabled={!!editingTower}/>
+                        <button onClick={addTower} className="px-4 py-2 bg-orange-200 text-orange-800 rounded-md hover:bg-orange-300 font-semibold disabled:bg-gray-200 disabled:text-gray-500" disabled={!!editingTower}>Agregar</button>
                     </div>
                     <ul className="mt-3 space-y-2">
                         {towers.map(t => (
                             <li key={t} className="flex justify-between items-center p-3 border rounded-md bg-orange-50">
-                                <span className="font-medium text-gray-800">{t}</span>
-                                <div className="flex items-center gap-4">
-                                    <label className="text-sm">Pisos:
-                                        <input type="number" min={1} value={pisos[t] || 1} onChange={e => setPisos({...pisos, [t]: Math.max(1, Number(e.target.value))})} className="w-20 ml-2 p-1 border rounded-md text-center"/>
-                                    </label>
-                                    <button onClick={() => removeTower(t)} className="text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>
-                                </div>
+                                {editingTower === t ? (
+                                    <>
+                                        <input 
+                                            value={newTowerName} 
+                                            onChange={e => setNewTowerName(e.target.value)}
+                                            onKeyPress={(e) => { if (e.key === 'Enter') handleUpdateTowerName(); }}
+                                            className="flex-grow p-1 border border-orange-400 rounded-md shadow-sm"
+                                            autoFocus
+                                        />
+                                        <div className="flex items-center gap-2 ml-4">
+                                            <button onClick={handleUpdateTowerName} className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600">Guardar</button>
+                                            <button onClick={handleCancelEdit} className="px-3 py-1 bg-gray-400 text-white text-sm rounded hover:bg-gray-500">Cancelar</button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="font-medium text-gray-800">{t}</span>
+                                        <div className="flex items-center gap-4">
+                                            <label className="text-sm">Pisos:
+                                                <input type="number" min={1} value={pisos[t] || 1} onChange={e => setPisos({...pisos, [t]: Math.max(1, Number(e.target.value))})} className="w-20 ml-2 p-1 border rounded-md text-center"/>
+                                            </label>
+                                            <button onClick={() => handleEditClick(t)} className="text-sm px-3 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200" disabled={!!editingTower}>Editar</button>
+                                            <button onClick={() => removeTower(t)} className="text-red-500 hover:text-red-700 font-bold text-xl" disabled={!!editingTower}>&times;</button>
+                                        </div>
+                                    </>
+                                )}
                             </li>
                         ))}
                     </ul>
                 </div>
 
-                {/* Gestión de Actividades */}
-                <div>
+                {/* Actividades (ahora de solo lectura) */}
+                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Actividades</label>
-                    <div className="flex gap-2">
-                        <input value={currentActivity} onChange={e => setCurrentActivity(e.target.value)} className="flex-grow p-2 border border-gray-300 rounded-md" placeholder="Nombre de la nueva actividad"/>
-                        <button onClick={addActivity} className="px-4 py-2 bg-orange-200 text-orange-800 rounded-md hover:bg-orange-300 font-semibold">Agregar</button>
+                    <div className="p-4 border rounded-md bg-gray-50 text-gray-600 text-sm">
+                        <p>Las actividades del proyecto ahora se gestionan directamente en la hoja de cálculo de Google Sheets (pestaña "PROG") y no se pueden editar aquí.</p>
                     </div>
-                    <ul className="mt-3 space-y-2">
-                        {activities.map(a => (
-                             <li key={a} className="flex justify-between items-center p-3 border rounded-md bg-orange-50">
-                                <span className="text-gray-800">{a}</span>
-                                <button onClick={() => removeActivity(a)} className="text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>
-                            </li>
-                        ))}
-                    </ul>
                 </div>
             </div>
 
             <div className="mt-8 pt-4 border-t">
-                 <div className="flex gap-4">
-                    <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-orange-600 text-white font-semibold rounded-lg hover:bg-orange-700 transition-colors disabled:bg-orange-300">
+                <div className="flex gap-4">
+                    <button onClick={handleSave} disabled={saving || !!editingTower} className="px-6 py-2 bg-orange-600 text-white font-semibold rounded-lg hover:bg-orange-700 transition-colors disabled:bg-orange-300">
                         {saving ? "Guardando..." : "Guardar Configuración"}
                     </button>
                     <button onClick={onCancel} disabled={saving} className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">Cancelar</button>

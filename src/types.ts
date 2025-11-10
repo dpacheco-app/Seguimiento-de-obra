@@ -8,6 +8,8 @@ export interface ProjectConfig {
   Torres: string[];
   PisosPorTorre: PisosPorTorre;
   Actividades: string[];
+  // FIX: La estructura ahora es anidada por torre: { [torre]: { [actividad]: { [piso]: porcentaje } } }
+  ScheduledProgress: { [tower: string]: { [activity: string]: { [floor: number]: number } } };
 }
 
 export interface ProgressRecord {

@@ -1,7 +1,7 @@
-import { ProjectConfig, ProgressRecord, TempProgressItem, PisosPorTorre } from './types';
+import { ProjectConfig, ProgressRecord, TempProgressItem, PisosPorTorre } from '../types';
 
 // La URL del Web App de Google Apps Script.
-const API_URL = "https://script.google.com/macros/s/AKfycbzrtdjbRjP6fPwVRvPkj7MLTUXyaf8lRw-aWADGlXL4ZFAxoRhxlykoQJ6KuEiWSbd7/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbx4KxPLS2hke_gMsH0JOSlXlmyzeYqcLeafZeQdNeQEGux9PWX9dyacYccE0lipHLVY/exec";
 
 /**
  * Maneja la respuesta de la API, parsea el JSON y verifica el status.
@@ -28,37 +28,43 @@ async function handleApiResponse(res: Response) {
  * Transforma la estructura de datos del backend a la que usa el frontend.
  */
 export async function fetchConfig(): Promise<ProjectConfig> {
-    const res = await fetch(`${API_URL}?action=getConfig`);
+    const url = new URL(API_URL);
+    url.searchParams.append('action', 'getConfig');
+    url.searchParams.append('cache_bust', new Date().getTime().toString());
+    const res = await fetch(url.toString());
     const data = await handleApiResponse(res);
 
+    const torresArray = Array.isArray(data.Torres)
+        ? data.Torres
+        : String(data.Torres || "").split(',').map(t => t.trim()).filter(Boolean);
+
     const pisosPorTorreObjeto: PisosPorTorre = {};
-    if (data.Torres && data.PisosPorTorre) {
-        data.Torres.forEach((torre: string, index: number) => {
-            pisosPorTorreObjeto[torre] = data.PisosPorTorre[index] || 1;
-        });
-    }
+    // FIX: El backend ahora envía un array numérico 'PisosPorTorre', lo que simplifica la lógica.
+    const pisosArray = Array.isArray(data.PisosPorTorre) ? data.PisosPorTorre : [];
+    
+    torresArray.forEach((torre: string, index: number) => {
+        // Se asigna el número de pisos del array directamente a la torre correspondiente.
+        pisosPorTorreObjeto[torre] = pisosArray[index] || 1;
+    });
 
     return {
         Proyecto: data.Proyecto || "",
-        Torres: data.Torres || [],
+        Torres: torresArray,
         PisosPorTorre: pisosPorTorreObjeto,
-        Actividades: data.Actividades || []
+        Actividades: data.Actividades || [],
+        ScheduledProgress: data.ScheduledProgress || {}
     };
 }
 
 /**
  * Guarda la configuración del proyecto.
- * Transforma los datos del frontend al formato que espera el backend y los envía.
  */
-export async function saveConfigToSheets(config: ProjectConfig) {
-    const pisosPorTorreArray = config.Torres.map(torre => config.PisosPorTorre[torre] || 1);
-
+export async function saveConfigToSheets(config: { proyecto: string; torres: string; pisosPorTorre: string }) {
     const params = new URLSearchParams();
     params.append('action', 'saveConfig');
-    params.append('proyecto', config.Proyecto);
-    params.append('torres', config.Torres.join(','));
-    params.append('pisosPorTorre', pisosPorTorreArray.join(','));
-    params.append('actividades', config.Actividades.join(','));
+    params.append('proyecto', config.proyecto);
+    params.append('torres', config.torres);
+    params.append('pisosPorTorre', config.pisosPorTorre);
 
     const res = await fetch(API_URL, {
         method: "POST",
@@ -69,11 +75,15 @@ export async function saveConfigToSheets(config: ProjectConfig) {
     return await handleApiResponse(res);
 }
 
+
 /**
  * Obtiene todos los registros de avance.
  */
 export async function fetchProgress(): Promise<ProgressRecord[]> {
-    const res = await fetch(`${API_URL}?action=fetchProgress`);
+    const url = new URL(API_URL);
+    url.searchParams.append('action', 'fetchProgress');
+    url.searchParams.append('cache_bust', new Date().getTime().toString());
+    const res = await fetch(url.toString());
     const data = await handleApiResponse(res);
     // Asegura que los tipos de dato sean correctos.
     return Array.isArray(data) ? data.map(item => ({ 

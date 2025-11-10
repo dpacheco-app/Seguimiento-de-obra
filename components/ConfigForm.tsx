@@ -21,8 +21,6 @@ export default function ConfigForm({ initialConfig, onSaved, onCancel }: ConfigF
     const [towers, setTowers] = useState<string[]>(initialConfig?.Torres || []);
     const [currentTower, setCurrentTower] = useState("");
     const [pisos, setPisos] = useState<PisosPorTorre>(initialConfig?.PisosPorTorre || {});
-    const [activities, setActivities] = useState<string[]>(initialConfig?.Actividades || []);
-    const [currentActivity, setCurrentActivity] = useState("");
     
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -46,39 +44,20 @@ export default function ConfigForm({ initialConfig, onSaved, onCancel }: ConfigF
         setPisos(newPisos);
     };
 
-    const addActivity = () => {
-        const newActivity = currentActivity.trim();
-        if (!newActivity || activities.includes(newActivity)) {
-             setError(activities.includes(newActivity) ? "Esa actividad ya existe." : "El nombre de la actividad no puede estar vacío.");
-            return;
-        }
-        setActivities([...activities, newActivity]);
-        setCurrentActivity("");
-        setError(null);
-    };
-
-    const removeActivity = (activityToRemove: string) => {
-        setActivities(activities.filter(a => a !== activityToRemove));
-    };
-
     const handleSave = async () => {
         setError(null);
-        if (!projectName.trim() || towers.length === 0 || activities.length === 0) {
-            setError("Debe ingresar un nombre de proyecto, y al menos una torre y una actividad.");
+        if (!projectName.trim() || towers.length === 0) {
+            setError("Debe ingresar un nombre de proyecto y al menos una torre.");
             return;
         }
         setSaving(true);
         try {
-            // Construir el objeto de configuración que espera el servicio robusto.
-            // La lógica de transformación de datos ahora vive en el servicio, no aquí.
             const configToSave = {
                 proyecto: projectName.trim(),
-                torres: towers,
-                pisosPorTorre: towers.map(t => pisos[t] || 1),
-                actividades: activities,
+                torres: towers.join(','),
+                pisosPorTorre: towers.map(t => pisos[t] || 1).join(','),
             };
             
-            // FIX: Pass the transformed payload to saveConfigToSheets.
             await saveConfigToSheets(configToSave);
             onSaved();
 
@@ -121,21 +100,12 @@ export default function ConfigForm({ initialConfig, onSaved, onCancel }: ConfigF
                     </ul>
                 </div>
 
-                {/* Gestión de Actividades */}
-                <div>
+                {/* Actividades (ahora de solo lectura) */}
+                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Actividades</label>
-                    <div className="flex gap-2">
-                        <input value={currentActivity} onChange={e => setCurrentActivity(e.target.value)} className="flex-grow p-2 border border-gray-300 rounded-md" placeholder="Nombre de la nueva actividad"/>
-                        <button onClick={addActivity} className="px-4 py-2 bg-orange-200 text-orange-800 rounded-md hover:bg-orange-300 font-semibold">Agregar</button>
+                    <div className="p-4 border rounded-md bg-gray-50 text-gray-600 text-sm">
+                        <p>Las actividades del proyecto ahora se gestionan directamente en la hoja de cálculo de Google Sheets (pestaña "PROG") y no se pueden editar aquí.</p>
                     </div>
-                    <ul className="mt-3 space-y-2">
-                        {activities.map(a => (
-                             <li key={a} className="flex justify-between items-center p-3 border rounded-md bg-orange-50">
-                                <span className="text-gray-800">{a}</span>
-                                <button onClick={() => removeActivity(a)} className="text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>
-                            </li>
-                        ))}
-                    </ul>
                 </div>
             </div>
 

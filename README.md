@@ -1,20 +1,26 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Seguimiento de Avance de Obra
 
-# Run and deploy your AI Studio app
+Esta es una aplicación web diseñada para simplificar el seguimiento del progreso en proyectos de construcción. Permite a los usuarios configurar proyectos con múltiples torres, pisos y actividades, registrar avances diarios y visualizar el estado general de la obra de manera gráfica e intuitiva.
 
-This contains everything you need to run your app locally.
+La aplicación utiliza Google Sheets como una base de datos backend, lo que facilita la configuración y el acceso a los datos sin necesidad de una infraestructura compleja.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1MkX-_3Y16hgSUzmdlE5UAuvjW66Vi5dE
+## Características Principales
 
-## Run Locally
+- **Configuración de Proyecto:** Defina el nombre del proyecto, las torres, el número de pisos por torre y las actividades a monitorear.
+- **Registro de Avance:** Ingrese registros de avance de forma rápida, especificando usuario, torre, piso, actividad y porcentaje de completado.
+- **Visualización Gráfica:** Vea una matriz de colores tipo torre que muestra el estado de cada actividad en cada piso, facilitando la identificación de cuellos de botella.
+- **Filtros Dinámicos:** Filtre la visualización por torre y por actividades para enfocarse en la información que necesita.
+- **Exportación a PDF:** Genere informes profesionales en formato PDF con un resumen del proyecto, la fecha y la visualización gráfica del avance.
 
-**Prerequisites:**  Node.js
+## Funcionalidad Crítica: Reiniciar Proyecto
 
+La aplicación incluye una función para reiniciar el proyecto, la cual **borra permanentemente todos los datos de configuración y avance registrados**. Esta acción no se puede deshacer.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Para prevenir la pérdida accidental de datos, esta función está protegida por un proceso de confirmación de dos pasos que incluye una contraseña.
+
+**Contraseña de Reinicio:**
+Para confirmar el reinicio del proyecto, se le solicitará una contraseña. La contraseña es:
+
+```
+belavi123
+```
