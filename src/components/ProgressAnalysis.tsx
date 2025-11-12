@@ -4,6 +4,7 @@ import { ProjectConfig } from "../types";
 import LoadingSpinner from "./LoadingSpinner";
 
 declare const Chart: any; // Using Chart.js from CDN
+declare const dateFns: any; // Using date-fns from CDN
 
 // A color palette for the chart lines
 const CHART_COLORS = [
@@ -81,7 +82,8 @@ export default function ProgressAnalysis({ config }: { config: ProjectConfig }) 
                 data: scheduledPoints,
                 borderColor: '#a9a9a9',
                 backgroundColor: '#a9a9a980', // For tooltip point color
-                tension: 0.1,
+                tension: 0,
+                // stepped: false, // Reverted to simple line
                 borderDash: [5, 5],
                 pointRadius: 4,
                 pointHoverRadius: 6,
@@ -131,7 +133,8 @@ export default function ProgressAnalysis({ config }: { config: ProjectConfig }) 
                 data: realPoints,
                 borderColor: color,
                 backgroundColor: `${color}80`,
-                tension: 0.1,
+                tension: 0,
+                // stepped: false, // Reverted to simple line
                 pointRadius: 4,
                 pointHoverRadius: 6,
             });
@@ -173,6 +176,11 @@ export default function ProgressAnalysis({ config }: { config: ProjectConfig }) 
                 scales: {
                     x: {
                         type: 'time',
+                        adapters: {
+                            date: {
+                                locale: dateFns.locale.es,
+                            },
+                        },
                         time: {
                             unit: 'week',
                             tooltipFormat: 'PPP', // date-fns format
@@ -203,34 +211,56 @@ export default function ProgressAnalysis({ config }: { config: ProjectConfig }) 
                         position: 'bottom',
                     },
                     tooltip: {
-                        mode: 'index',
-                        intersect: false,
+                        mode: 'nearest', // Only show tooltip for the nearest item
+                        intersect: true, // Tooltip only appears when hovering over a point
                         callbacks: {
+                            label: function(context: any) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += `${context.parsed.y}%`;
+                                }
+                                return label;
+                            },
                             footer: (tooltipItems: any[]) => {
-                                const scheduledDataset = processedData.datasets.find(ds => ds.label.includes('(Programado)'));
-                                const realDataset = processedData.datasets.find(ds => ds.label.includes('(Real)'));
-                        
-                                if (!tooltipItems.length || !scheduledDataset) {
+                                const tooltipItem = tooltipItems[0];
+                                if (!tooltipItem || !processedData?.datasets) return '';
+                            
+                                const currentTimestamp = tooltipItem.parsed.x;
+                                const isRealDataset = tooltipItem.dataset.label.includes('(Real)');
+                            
+                                const realDataset = processedData.datasets.find((ds: any) => ds.label.includes('(Real)'));
+                                const scheduledDataset = processedData.datasets.find((ds: any) => ds.label.includes('(Programado)'));
+                            
+                                // Don't show difference if one of the lines is missing or there's no real data.
+                                if (!realDataset || !scheduledDataset || realDataset.data.length === 0) {
                                     return '';
                                 }
-                        
-                                const currentTimestamp = tooltipItems[0].parsed.x;
-                        
-                                const scheduledTooltipItem = tooltipItems.find(item => item.dataset.label.includes('(Programado)'));
-                                if (!scheduledTooltipItem) return '';
                                 
-                                const scheduledProgress = scheduledTooltipItem.raw.y;
-                        
-                                let lastRealProgress = 0;
-                                if (realDataset && realDataset.data.length > 0) {
-                                    const relevantRealPoints = realDataset.data.filter(p => p.x <= currentTimestamp);
+                                let realProgress = 0;
+                                let scheduledProgress = 0;
+                            
+                                if (isRealDataset) {
+                                    realProgress = tooltipItem.parsed.y;
+                                    
+                                    // Find the corresponding scheduled progress
+                                    const relevantScheduledPoints = scheduledDataset.data.filter((p: { x: number; y: number; }) => p.x <= currentTimestamp);
+                                    if (relevantScheduledPoints.length > 0) {
+                                        scheduledProgress = relevantScheduledPoints[relevantScheduledPoints.length - 1].y;
+                                    }
+                                } else { // It's the scheduled dataset
+                                    scheduledProgress = tooltipItem.parsed.y;
+                                    
+                                    // Find the corresponding real progress
+                                    const relevantRealPoints = realDataset.data.filter((p: { x: number; y: number; }) => p.x <= currentTimestamp);
                                     if (relevantRealPoints.length > 0) {
-                                        lastRealProgress = relevantRealPoints[relevantRealPoints.length - 1].y;
+                                        realProgress = relevantRealPoints[relevantRealPoints.length - 1].y;
                                     }
                                 }
-                        
-                                const difference = lastRealProgress - scheduledProgress;
-                        
+                            
+                                const difference = realProgress - scheduledProgress;
                                 return `Diferencia: ${difference.toFixed(1)}%`;
                             }
                         }
@@ -239,7 +269,7 @@ export default function ProgressAnalysis({ config }: { config: ProjectConfig }) 
                 interaction: {
                     mode: 'nearest',
                     axis: 'x',
-                    intersect: false
+                    intersect: true // Only trigger interaction on hover of a point
                 }
             }
         });
