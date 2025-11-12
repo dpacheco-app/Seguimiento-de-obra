@@ -6,11 +6,12 @@ import ConfigForm from "./components/ConfigForm";
 import ProjectSummary from "./components/ProjectSummary";
 import ProgressForm from "./components/ProgressForm";
 import TowerVisualization from "./components/TowerVisualization";
+import ProgressAnalysis from "./components/ProgressAnalysis";
 import LoadingSpinner from "./components/LoadingSpinner";
 import { useConfig } from "./hooks/useGoogleSheetsData";
 import { ProjectConfig } from "./types";
 
-type View = "home" | "configEdit" | "projectSummary" | "addProgress" | "visualize";
+type View = "home" | "configEdit" | "projectSummary" | "addProgress" | "visualize" | "progressAnalysis";
 
 export default function App() {
   const [view, setView] = useState<View>("home");
@@ -44,6 +45,7 @@ export default function App() {
             onConfig={() => setView("projectSummary")}
             onAddProgress={() => setView("addProgress")}
             onVisualize={() => setView("visualize")}
+            onAnalyze={() => setView("progressAnalysis")}
           />
         )}
 
@@ -77,6 +79,10 @@ export default function App() {
             config={config as ProjectConfig}
             onAddProgress={() => setView("addProgress")}
           />
+        )}
+
+        {view === "progressAnalysis" && (
+            <ProgressAnalysis config={config as ProjectConfig} />
         )}
       </main>
     </div>

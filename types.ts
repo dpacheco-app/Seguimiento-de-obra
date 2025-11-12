@@ -8,7 +8,8 @@ export interface ProjectConfig {
   Torres: string[];
   PisosPorTorre: PisosPorTorre;
   Actividades: string[];
-  ScheduledProgress: { [activity: string]: number };
+  ScheduledProgress: { [tower: string]: { [activity: string]: { [floor: number]: number } } };
+  ScheduledTimeline: { [tower: string]: { [activity: string]: { date: string; progress: number }[] } };
 }
 
 export interface ProgressRecord {
@@ -19,6 +20,7 @@ export interface ProgressRecord {
   Actividad: string;
   Avance: number;
   Fecha: string;
+  Notas?: string;
 }
 
 export interface TempProgressItem {
@@ -27,4 +29,5 @@ export interface TempProgressItem {
   Piso: number;
   Actividad: string;
   Avance: number;
+  Notas?: string;
 }

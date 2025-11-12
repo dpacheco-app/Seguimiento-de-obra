@@ -53,15 +53,13 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
 
     selectedActivities.forEach(activity => {
         let totalProgress = 0;
-        let recordCount = 0;
         for (let piso = 1; piso <= pisosParaTorre; piso++) {
             const record = progressMap.get(`${selectedTower}-${piso}-${activity}`);
             if (record) {
                 totalProgress += record.Avance;
-                recordCount++;
             }
         }
-        const average = recordCount > 0 ? totalProgress / recordCount : 0; // Se promedia sobre los pisos con avance
+        const average = pisosParaTorre > 0 ? totalProgress / pisosParaTorre : 0;
         totals.set(activity, Math.round(average));
     });
 
@@ -79,49 +77,41 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
     return "bg-gray-200";
   };
 
-  const handleRealMouseEnter = (e: React.MouseEvent, record: ProgressRecord | undefined, piso: number, actividad: string) => {
-    const scheduled = config.ScheduledProgress?.[selectedTower]?.[actividad]?.[piso];
-    let content;
-
+  const handleMouseEnter = (e: React.MouseEvent, record: ProgressRecord | undefined, piso: number, actividad: string) => {
     if (record) {
-        const formattedDate = new Date(record.Fecha).toLocaleDateString('es-ES');
-        content = `<strong>Torre:</strong> ${record.Torre}<br/><strong>Piso:</strong> ${piso}<br/><strong>Actividad:</strong> ${actividad}<br/><strong>Avance Real:</strong> ${record.Avance}%<br/><strong>Fecha:</strong> ${formattedDate}<br/><strong>Usuario:</strong> ${record.Usuario}`;
-        if (scheduled !== undefined) {
-             content += `<br/><strong>Avance Programado:</strong> ${scheduled}%`;
-        }
-    } else {
-        content = `<strong>Torre:</strong> ${selectedTower}<br/><strong>Piso:</strong> ${piso}<br/><strong>Actividad:</strong> ${actividad}<br/><strong>Avance Real:</strong> No registrado`;
-        if (scheduled !== undefined) {
-            content += `<br/><strong>Avance Programado:</strong> ${scheduled}%`;
-        }
-    }
-    setTooltip({ content, x: e.pageX, y: e.pageY });
-  };
+      const formattedDate = new Date(record.Fecha).toLocaleDateString('es-ES');
+      let tooltipContent = `<strong>Torre:</strong> ${record.Torre}<br/><strong>Piso:</strong> ${piso}<br/><strong>Actividad:</strong> ${actividad}<br/><strong>Avance Real:</strong> ${record.Avance}%<br/><strong>Fecha:</strong> ${formattedDate}<br/><strong>Usuario:</strong> ${record.Usuario}`;
+      
+      if (record.Notas) {
+        tooltipContent += `<br/><strong>Notas:</strong> ${record.Notas}`;
+      }
 
-  const handleScheduledMouseEnter = (e: React.MouseEvent, value: number | undefined, piso: number, actividad: string) => {
-    let content = `<strong>Torre:</strong> ${selectedTower}<br/><strong>Piso:</strong> ${piso}<br/><strong>Actividad:</strong> ${actividad}<br/>`;
-    if (value !== undefined) {
-        content += `<strong>Avance Programado:</strong> ${value}%`;
-    } else {
-        content += `<strong>Avance Programado:</strong> No definido`;
+      setTooltip({
+        content: tooltipContent,
+        x: e.pageX,
+        y: e.pageY,
+      });
     }
-     setTooltip({ content, x: e.pageX, y: e.pageY });
   };
-
- const handleTotalMouseEnter = (e: React.MouseEvent, value: number | undefined, actividad: string, isScheduled: boolean) => {
-    if (value === undefined) {
-        const title = isScheduled ? 'Promedio Programado' : 'Promedio Real';
-        setTooltip({
-          content: `<strong>Actividad:</strong> ${actividad}<br/><strong>${title}:</strong> No hay datos`,
-          x: e.pageX,
-          y: e.pageY,
-        });
-        return;
-    }
-    const title = isScheduled ? 'Avance Promedio Programado' : 'Avance Promedio Real';
-    const note = isScheduled ? "<i class='text-gray-300'>Promedio de valores definidos</i>" : "<i class='text-gray-300'>Promedio de avances registrados</i>";
+  
+  const handleProgrammedCellMouseEnter = (e: React.MouseEvent, value: number | undefined, piso: number, actividad: string) => {
+    if (value === undefined) return;
     setTooltip({
-      content: `<strong>Actividad:</strong> ${actividad}<br/><strong>${title}:</strong> ${value}%<br/>${note}`,
+      content: `<strong>Torre:</strong> ${selectedTower}<br/><strong>Piso:</strong> ${piso}<br/><strong>Actividad:</strong> ${actividad}<br/><strong>Avance Programado:</strong> ${value}%`,
+      x: e.pageX,
+      y: e.pageY,
+    });
+  };
+
+  const handleTotalMouseEnter = (e: React.MouseEvent, value: number | undefined, actividad: string, isScheduled: boolean = false) => {
+    if (value === undefined) return;
+    const title = isScheduled ? 'Avance Programado (Promedio)' : 'Avance Promedio Real';
+    let content = `<strong>Actividad:</strong> ${actividad}<br/><strong>${title}:</strong> ${value}%`;
+    if (!isScheduled) {
+        content += `<br/><i class='text-gray-300'>Promedio en toda la torre</i>`;
+    }
+    setTooltip({
+      content,
       x: e.pageX,
       y: e.pageY,
     });
@@ -255,14 +245,14 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
                 
                 <div className="font-bold text-sm text-center sticky top-0 z-20 bg-orange-200 p-2 rounded-tl-md row-span-2 flex items-center justify-center">Piso</div>
                 
-                {selectedActivities.map(a => (
-                    <div key={a} className="font-bold text-sm text-center sticky top-0 z-20 bg-orange-200 p-2 truncate col-span-2 border-r-2 border-orange-300" title={a}>{a}</div>
+                {selectedActivities.map((a, i) => (
+                    <div key={a} className={`font-bold text-sm text-center sticky top-0 z-20 bg-orange-200 p-2 truncate col-span-2 ${i > 0 ? 'ml-1' : ''}`} title={a}>{a}</div>
                 ))}
                 
-                {selectedActivities.map(a => (
+                {selectedActivities.map((a, i) => (
                     <React.Fragment key={`${a}-sub`}>
-                        <div className="font-semibold text-xs text-center sticky top-10 z-20 bg-orange-100 p-1 rounded-sm">Real</div>
-                        <div className="font-semibold text-xs text-center sticky top-10 z-20 bg-orange-100 p-1 rounded-sm border-r-2 border-orange-300">Prog.</div>
+                        <div className={`font-semibold text-xs text-center sticky top-10 z-20 bg-orange-100 p-1 rounded-l-sm ${i > 0 ? 'ml-1' : ''}`}>Real</div>
+                        <div className="font-semibold text-xs text-center sticky top-10 z-20 bg-orange-100 p-1 rounded-r-sm">Prog.</div>
                     </React.Fragment>
                 ))}
                 
@@ -271,26 +261,26 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
                         <div className="font-bold text-sm text-center bg-orange-200 p-2 flex items-center justify-center sticky left-0 z-10">
                             {piso}
                         </div>
-                        {selectedActivities.map(actividad => {
+                        {selectedActivities.map((actividad, i) => {
                             const record = getCellRecord(selectedTower, piso, actividad);
                             const avanceReal = record?.Avance;
-                            const avanceProgramado = config.ScheduledProgress?.[selectedTower]?.[actividad]?.[piso];
-                            
                             const colorClassReal = colorFor(avanceReal);
+                            
+                            const avanceProgramado = config.ScheduledProgress?.[selectedTower]?.[actividad]?.[piso];
                             const colorClassProgramado = colorFor(avanceProgramado);
 
                             return (
                                 <React.Fragment key={`${piso}-${actividad}`}>
                                     <div
-                                        className={`h-12 flex items-center justify-center text-sm font-medium transition-colors ${colorClassReal}`}
-                                        onMouseEnter={(e) => handleRealMouseEnter(e, record, piso, actividad)}
+                                        className={`h-12 rounded-l-md flex items-center justify-center text-sm font-medium transition-colors ${colorClassReal} ${i > 0 ? 'ml-1' : ''}`}
+                                        onMouseEnter={(e) => handleMouseEnter(e, record, piso, actividad)}
                                         onMouseLeave={handleMouseLeave}
                                     >
                                         {avanceReal !== undefined ? `${avanceReal}%` : "-"}
                                     </div>
                                     <div
-                                        className={`h-12 flex items-center justify-center text-sm font-medium transition-colors ${colorClassProgramado} border-r-2 border-orange-300`}
-                                        onMouseEnter={(e) => handleScheduledMouseEnter(e, avanceProgramado, piso, actividad)}
+                                        className={`h-12 rounded-r-md flex items-center justify-center text-sm font-medium transition-colors ${colorClassProgramado}`}
+                                        onMouseEnter={(e) => handleProgrammedCellMouseEnter(e, avanceProgramado, piso, actividad)}
                                         onMouseLeave={handleMouseLeave}
                                     >
                                         {avanceProgramado !== undefined ? `${avanceProgramado}%` : "-"}
@@ -301,10 +291,10 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
                     </React.Fragment>
                 ))}
 
-                <div className="font-bold text-sm text-center bg-orange-200 p-2 flex items-center justify-center rounded-bl-md sticky left-0 z-10 border-t-4 border-orange-300">
+                <div className="font-bold text-sm text-center bg-orange-200 p-2 flex items-center justify-center rounded-bl-md sticky left-0 z-10">
                     Total Avance
                 </div>
-                {selectedActivities.map(actividad => {
+                {selectedActivities.map((actividad, i) => {
                     const averageReal = activityTotals.get(actividad);
                     const colorClassReal = colorFor(averageReal);
 
@@ -320,20 +310,20 @@ export default function TowerVisualization({ config, onAddProgress }: { config: 
                             }
                         }
                     }
-                    const averageProgrammed = programmedCount > 0 ? Math.round(totalProgrammed / programmedCount) : undefined;
+                    const averageProgrammed = programmedCount > 0 ? Math.round(totalProgrammed / programmedCount) : 0;
                     const colorClassProgramado = colorFor(averageProgrammed);
 
                     return (
                         <React.Fragment key={`total-${actividad}`}>
                             <div
-                                className={`h-12 flex items-center justify-center text-sm font-medium transition-colors ${colorClassReal} border-t-4 border-orange-300`}
+                                className={`h-12 rounded-l-md flex items-center justify-center text-sm font-medium transition-colors ${colorClassReal} ${i > 0 ? 'ml-1' : ''}`}
                                 onMouseEnter={(e) => handleTotalMouseEnter(e, averageReal, actividad, false)}
                                 onMouseLeave={handleMouseLeave}
                             >
                                 {averageReal !== undefined ? `${averageReal}%` : "-"}
                             </div>
                              <div
-                                className={`h-12 flex items-center justify-center text-sm font-medium transition-colors ${colorClassProgramado} border-t-4 border-orange-300 border-r-2 border-orange-300`}
+                                className={`h-12 rounded-r-md flex items-center justify-center text-sm font-medium transition-colors ${colorClassProgramado}`}
                                 onMouseEnter={(e) => handleTotalMouseEnter(e, averageProgrammed, actividad, true)}
                                 onMouseLeave={handleMouseLeave}
                             >

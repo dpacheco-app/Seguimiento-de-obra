@@ -15,6 +15,7 @@ export default function ProgressForm({ config, onSaved, onBack }: ProgressFormPr
   const [piso, setPiso] = useState(1);
   const [actividad, setActividad] = useState(config?.Actividades?.[0] || "");
   const [avance, setAvance] = useState<string>("0");
+  const [notas, setNotas] = useState(""); // Estado para las notas
   
   const [items, setItems] = useState<TempProgressItem[]>([]);
   const [saving, setSaving] = useState(false);
@@ -22,7 +23,6 @@ export default function ProgressForm({ config, onSaved, onBack }: ProgressFormPr
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    // Resetear el piso si la torre cambia y la torre existe en la config
     if (config?.PisosPorTorre?.[tower]) {
         setPiso(1);
     }
@@ -35,8 +35,9 @@ export default function ProgressForm({ config, onSaved, onBack }: ProgressFormPr
     if (!tower || !actividad) { setError("Por favor, seleccione torre y actividad."); return; }
     if (isNaN(avanceNum) || avanceNum < 0 || avanceNum > 100) { setError("El valor de avance debe ser un número entre 0 y 100."); return; }
     
-    setItems([...items, { Usuario: usuario.trim(), Torre: tower, Piso: Number(piso), Actividad: actividad, Avance: avanceNum }]);
+    setItems([...items, { Usuario: usuario.trim(), Torre: tower, Piso: Number(piso), Actividad: actividad, Avance: avanceNum, Notas: notas.trim() }]);
     setAvance("0");
+    setNotas(""); // Limpiar el campo de notas
   };
 
   const removeItem = (index: number) => {
@@ -52,7 +53,6 @@ export default function ProgressForm({ config, onSaved, onBack }: ProgressFormPr
       await saveProgressToSheets(items);
       setSuccess("¡Avances guardados con éxito!");
       setItems([]);
-      // Esperar un momento para que el usuario vea el mensaje de éxito antes de navegar
       setTimeout(() => {
         onSaved();
       }, 1500);
@@ -73,11 +73,9 @@ export default function ProgressForm({ config, onSaved, onBack }: ProgressFormPr
       {success && <div className="p-3 mb-4 text-green-700 bg-green-100 border border-green-400 rounded">{success}</div>}
 
       <div className="bg-orange-50 p-4 rounded-lg border space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
-              <input value={usuario} onChange={e => setUsuario(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="Su nombre" />
-            </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+          <input value={usuario} onChange={e => setUsuario(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="Su nombre" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
@@ -99,6 +97,10 @@ export default function ProgressForm({ config, onSaved, onBack }: ProgressFormPr
                 </select>
             </div>
         </div>
+        <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notas / Observaciones (Opcional)</label>
+            <textarea value={notas} onChange={e => setNotas(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" rows={2} placeholder="Añada alguna observación aquí..."></textarea>
+        </div>
         <div className="flex items-end gap-4">
             <div className="flex-grow">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Avance (%)</label>
@@ -113,9 +115,12 @@ export default function ProgressForm({ config, onSaved, onBack }: ProgressFormPr
         <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
           {items.length === 0 && <p className="text-gray-500">Aún no hay avances en la lista.</p>}
           {items.map((it, idx) => (
-            <div key={idx} className="flex justify-between items-center p-3 border rounded-md bg-white shadow-sm">
-              <span className="text-sm text-gray-800">{it.Usuario} | {it.Torre} - Piso {it.Piso} - {it.Actividad} &rarr; <strong>{it.Avance}%</strong></span>
-              <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 font-bold">&times;</button>
+            <div key={idx} className="p-3 border rounded-md bg-white shadow-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-800">{it.Usuario} | {it.Torre} - Piso {it.Piso} - {it.Actividad} &rarr; <strong>{it.Avance}%</strong></span>
+                <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 font-bold">&times;</button>
+              </div>
+              {it.Notas && <p className="text-xs text-gray-600 mt-2 pt-2 border-t border-gray-200"><strong>Nota:</strong> {it.Notas}</p>}
             </div>
           ))}
         </div>

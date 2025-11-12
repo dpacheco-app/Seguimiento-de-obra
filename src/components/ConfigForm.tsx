@@ -1,4 +1,4 @@
-// src/components/ConfigForm.tsx
+
 import React, { useState } from "react";
 import { saveConfigToSheets } from "../services/googleSheetsService";
 import { ProjectConfig, PisosPorTorre } from "../types";

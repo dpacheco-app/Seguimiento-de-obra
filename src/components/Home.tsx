@@ -5,6 +5,7 @@ interface HomeProps {
   onConfig: () => void;
   onAddProgress: () => void;
   onVisualize: () => void;
+  onAnalyze: () => void;
 }
 
 const Card = ({ title, description, onClick, icon }: { title: string, description: string, onClick: () => void, icon: React.ReactNode }) => (
@@ -21,9 +22,9 @@ const Card = ({ title, description, onClick, icon }: { title: string, descriptio
 );
 
 
-export default function Home({ onConfig, onAddProgress, onVisualize }: HomeProps) {
+export default function Home({ onConfig, onAddProgress, onVisualize, onAnalyze }: HomeProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <Card
         onClick={onConfig}
         title="Configurar Proyecto"
@@ -41,6 +42,12 @@ export default function Home({ onConfig, onAddProgress, onVisualize }: HomeProps
         title="Visualizar Avance"
         description="Ver la matriz de avance tipo torre con filtros y exportación a PDF."
         icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>}
+      />
+       <Card
+        onClick={onAnalyze}
+        title="Análisis de Avance"
+        description="Comparar el avance real vs. el programado en una gráfica de tiempo."
+        icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
       />
     </div>
   );

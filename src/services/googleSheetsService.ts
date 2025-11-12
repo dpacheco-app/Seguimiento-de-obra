@@ -1,7 +1,7 @@
 import { ProjectConfig, ProgressRecord, TempProgressItem, PisosPorTorre } from '../types';
 
 // La URL del Web App de Google Apps Script.
-const API_URL = "https://script.google.com/macros/s/AKfycbx4KxPLS2hke_gMsH0JOSlXlmyzeYqcLeafZeQdNeQEGux9PWX9dyacYccE0lipHLVY/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxl8ZxVfNQtLlSWShJsACnaslgXevytFrXxoerUSAJSdCDgF9q4E9WCmExWaqtkmxoC/exec";
 
 /**
  * Maneja la respuesta de la API, parsea el JSON y verifica el status.
@@ -39,11 +39,9 @@ export async function fetchConfig(): Promise<ProjectConfig> {
         : String(data.Torres || "").split(',').map(t => t.trim()).filter(Boolean);
 
     const pisosPorTorreObjeto: PisosPorTorre = {};
-    // FIX: El backend ahora envía un array numérico 'PisosPorTorre', lo que simplifica la lógica.
     const pisosArray = Array.isArray(data.PisosPorTorre) ? data.PisosPorTorre : [];
     
     torresArray.forEach((torre: string, index: number) => {
-        // Se asigna el número de pisos del array directamente a la torre correspondiente.
         pisosPorTorreObjeto[torre] = pisosArray[index] || 1;
     });
 
@@ -52,7 +50,8 @@ export async function fetchConfig(): Promise<ProjectConfig> {
         Torres: torresArray,
         PisosPorTorre: pisosPorTorreObjeto,
         Actividades: data.Actividades || [],
-        ScheduledProgress: data.ScheduledProgress || {}
+        ScheduledProgress: data.ScheduledProgress || {},
+        ScheduledTimeline: data.ScheduledTimeline || {}
     };
 }
 
@@ -60,16 +59,10 @@ export async function fetchConfig(): Promise<ProjectConfig> {
  * Guarda la configuración del proyecto.
  */
 export async function saveConfigToSheets(config: { proyecto: string; torres: string; pisosPorTorre: string }) {
-    const params = new URLSearchParams();
-    params.append('action', 'saveConfig');
-    params.append('proyecto', config.proyecto);
-    params.append('torres', config.torres);
-    params.append('pisosPorTorre', config.pisosPorTorre);
-
-    const res = await fetch(API_URL, {
+    const res = await fetch(`${API_URL}?action=saveConfig`, {
         method: "POST",
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString(),
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(config),
     });
 
     return await handleApiResponse(res);
@@ -85,10 +78,9 @@ export async function fetchProgress(): Promise<ProgressRecord[]> {
     url.searchParams.append('cache_bust', new Date().getTime().toString());
     const res = await fetch(url.toString());
     const data = await handleApiResponse(res);
-    // Asegura que los tipos de dato sean correctos.
     return Array.isArray(data) ? data.map(item => ({ 
         ...item, 
-        Fecha: item.Timestamp, // Añade Fecha para compatibilidad con el tipo
+        Fecha: item.Timestamp,
         Piso: Number(item.Piso), 
         Avance: Number(item.Avance) 
     })) : [];
@@ -98,37 +90,22 @@ export async function fetchProgress(): Promise<ProgressRecord[]> {
  * Guarda una lista de nuevos avances en el backend.
  */
 export async function saveProgressToSheets(rows: TempProgressItem[]) {
-    for (const row of rows) {
-         const params = new URLSearchParams();
-         params.append('action', 'saveAvance');
-         params.append('usuario', row.Usuario);
-         params.append('torre', row.Torre);
-         params.append('piso', String(row.Piso));
-         params.append('actividad', row.Actividad);
-         params.append('avance', String(row.Avance));
-
-        const res = await fetch(API_URL, {
-            method: "POST",
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString(),
-        });
-        // Valida la respuesta de cada guardado individualmente.
-        await handleApiResponse(res);
-    }
+    const res = await fetch(`${API_URL}?action=saveAvance`, {
+        method: "POST",
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(rows),
+    });
+    return await handleApiResponse(res);
 }
 
 /**
  * Envía una solicitud para borrar todos los datos del proyecto en la hoja de cálculo.
  */
 export async function resetProject() {
-    const params = new URLSearchParams();
-    params.append('action', 'resetProject');
-    
-    const res = await fetch(API_URL, {
+    const res = await fetch(`${API_URL}?action=resetProject`, {
         method: "POST",
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString(),
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: "{}",
     });
-
     return await handleApiResponse(res);
 }
